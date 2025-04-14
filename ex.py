@@ -11,9 +11,9 @@ from mlflow.exceptions import MlflowException
 
 def setup_mlflow():
     """Setup MLflow tracking"""
-    mlflow.set_tracking_uri("https://dagshub.com/khalidasdsju/mlfow-test.mlflow")
+    mlflow.set_tracking_uri("https://dagshub.com/khalidasdsju/End-to-End-Chest-Cancer-Classification-using-MLflow-DVC.mlflow")
     os.environ['MLFLOW_TRACKING_USERNAME'] = "khalidasdsju"
-    os.environ['MLFLOW_TRACKING_PASSWORD'] = "fa7c93347be99dd39bbbb1095d705144de5f448b"
+    os.environ['MLFLOW_TRACKING_PASSWORD'] = "55e0fd18547b3cb185580e2c4f3932fd668f1257"
 
 def get_latest_version():
     """Get the latest model version"""
@@ -44,7 +44,7 @@ def train_regression_model():
 
     # Define model parameters
     params = {
-        "n_estimators": 100,
+        "n_estimators": 1000,
         "criterion": "squared_error",
         "max_depth": None,
         "min_samples_split": 15,
