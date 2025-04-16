@@ -1,3 +1,10 @@
+import tensorflow as tf
+
+# Enable eager execution
+tf.config.run_functions_eagerly(True)
+# Enable debug mode for tf.data
+tf.data.experimental.enable_debug_mode()
+
 from cnnClassifier.config.configuration import ConfigurationManager
 from cnnClassifier.components.model_trainer import Training
 from cnnClassifier import logger
@@ -13,12 +20,22 @@ class ModelTrainingPipeline:
         pass
 
     def main(self):
-        config = ConfigurationManager()
-        training_config = config.get_training_config()
-        training = Training(config=training_config)
-        training.get_base_model()
-        training.train_valid_generator()
-        training.train()
+        try:
+            config = ConfigurationManager()
+            training_config = config.get_training_config()
+            training = Training(config=training_config)
+            training.get_base_model()
+            training.train_valid_generator()
+            # Recreate the optimizer after loading the model
+            training.model.compile(
+                optimizer=tf.keras.optimizers.Adam(),
+                loss="categorical_crossentropy",
+                metrics=["accuracy"]
+            )
+            training.train()
+            
+        except Exception as e:
+            raise e
 
 
 
