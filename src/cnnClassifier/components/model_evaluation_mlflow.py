@@ -100,13 +100,40 @@ class Evaluation:
                 model_path = os_module.path.join(temp_dir, "model.keras")
                 self.model.save(model_path)
 
-                # Log the saved model to MLFlow
+                # Log the saved model to MLFlow and register it in the Model Registry
+                model_name = "ChestCancerClassifierModel"
+
                 if tracking_url_type_store != "file":
-                    mlflow.log_artifact(model_path, "model")
-                    print(f"Model saved to {model_path} and logged to MLFlow")
+                    # Log the model
+                    mlflow.keras.log_model(
+                        self.model,
+                        "model",
+                        registered_model_name=model_name
+                    )
+                    print(f"Model saved to {model_path} and registered in MLFlow Model Registry as '{model_name}'")
+
+                    # Get the latest version of the registered model
+                    from mlflow.tracking import MlflowClient
+                    client = MlflowClient()
+
+                    # Get the latest version
+                    try:
+                        latest_version = max([model.version for model in client.search_model_versions(f"name='{model_name}'")])
+                        print(f"Latest version of the model: {latest_version}")
+
+                        # Transition the model to 'Staging'
+                        client.transition_model_version_stage(
+                            name=model_name,
+                            version=latest_version,
+                            stage="Staging"
+                        )
+                        print(f"Model version {latest_version} transitioned to 'Staging' stage")
+                    except Exception as e:
+                        print(f"Warning: Could not transition model to staging: {str(e)}")
                 else:
-                    mlflow.log_artifact(model_path, "model")
-                    print(f"Model saved to {model_path} and logged to MLFlow")
+                    # For local tracking, just log the model without registering
+                    mlflow.keras.log_model(self.model, "model")
+                    print(f"Model saved to {model_path} and logged to MLFlow (local tracking)")
                 print("MLFlow run completed successfully")
         except Exception as e:
             print(f"Error in MLFlow logging: {str(e)}")
