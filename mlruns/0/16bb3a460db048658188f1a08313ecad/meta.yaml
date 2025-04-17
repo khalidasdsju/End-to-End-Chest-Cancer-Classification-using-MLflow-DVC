@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/khalid/Desktop/End-to-End-Chest-Cancer-Classification-using-MLflow-DVC/mlruns/0/16bb3a460db048658188f1a08313ecad/artifacts
+end_time: 1744891509483
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 16bb3a460db048658188f1a08313ecad
+run_name: sincere-ray-764
+run_uuid: 16bb3a460db048658188f1a08313ecad
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1744891509475
+status: 4
+tags: []
+user_id: khalid

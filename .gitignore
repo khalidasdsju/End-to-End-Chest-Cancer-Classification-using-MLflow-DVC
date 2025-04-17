@@ -173,3 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypir
 artifacts/*
+terminal_commands.sh/*

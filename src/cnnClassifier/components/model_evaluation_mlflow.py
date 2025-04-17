@@ -1,0 +1,115 @@
+import tensorflow as tf
+from pathlib import Path
+import mlflow
+import os
+import tempfile
+from urllib.parse import urlparse
+from cnnClassifier.entity.config_entity import EvaluationConfig
+from cnnClassifier.utils.common import read_yaml, create_directories,save_json
+
+
+class Evaluation:
+    def __init__(self, config: EvaluationConfig):
+        self.config = config
+
+
+    def _valid_generator(self):
+
+        datagenerator_kwargs = dict(
+            rescale = 1./255,
+            validation_split=0.30
+        )
+
+        dataflow_kwargs = dict(
+            target_size=self.config.params_image_size[:-1],
+            batch_size=self.config.params_batch_size,
+            interpolation="bilinear"
+        )
+
+        valid_datagenerator = tf.keras.preprocessing.image.ImageDataGenerator(
+            **datagenerator_kwargs
+        )
+
+        self.valid_generator = valid_datagenerator.flow_from_directory(
+            directory=self.config.training_data,
+            subset="validation",
+            shuffle=False,
+            **dataflow_kwargs
+        )
+
+
+    @staticmethod
+    def load_model(path: Path) -> tf.keras.Model:
+        return tf.keras.models.load_model(path)
+
+
+    def evaluation(self):
+        self.model = self.load_model(self.config.path_of_model)
+        self._valid_generator()
+        self.score = self.model.evaluate(self.valid_generator)
+        self.save_score()
+
+    def save_score(self):
+        scores = {"loss": self.score[0], "accuracy": self.score[1]}
+        save_json(path=Path("scores.json"), data=scores)
+
+
+    def log_into_mlflow(self):
+        try:
+            # Set MLFlow tracking URI
+            print(f"Setting MLFlow tracking URI to: {self.config.mlflow_uri}")
+            mlflow.set_tracking_uri(self.config.mlflow_uri)
+
+            # Credentials will be automatically picked up from environment variables
+            # MLFLOW_TRACKING_USERNAME and MLFLOW_TRACKING_PASSWORD
+            import os as os_module
+            print(f"MLFlow username: {os_module.environ.get('MLFLOW_TRACKING_USERNAME')}")
+            print(f"MLFlow password is set: {bool(os_module.environ.get('MLFLOW_TRACKING_PASSWORD'))}")
+
+            tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
+            print(f"Tracking URL type: {tracking_url_type_store}")
+
+            # Get experiment information for debugging
+            print("Current experiment info:")
+            try:
+                current_experiment = mlflow.get_experiment_by_name("cnnclassifier")
+                if current_experiment:
+                    print(f"  - {current_experiment.name} (ID: {current_experiment.experiment_id})")
+                else:
+                    print("  - No experiment named 'cnnclassifier' found")
+            except Exception as e:
+                print(f"  - Error getting experiment info: {str(e)}")
+
+            print("Starting MLFlow run...")
+            with mlflow.start_run():
+                print("Logging parameters...")
+                mlflow.log_params(self.config.all_params)
+
+                print("Logging metrics...")
+                mlflow.log_metrics(
+                    {"loss": self.score[0], "accuracy": self.score[1]}
+                )
+
+                print(f"Logging model (tracking type: {tracking_url_type_store})...")
+                # Create a temporary file with the correct extension
+                import tempfile
+                import os as os_module
+
+                # Save the model to a temporary file with .keras extension
+                temp_dir = tempfile.mkdtemp()
+                model_path = os_module.path.join(temp_dir, "model.keras")
+                self.model.save(model_path)
+
+                # Log the saved model to MLFlow
+                if tracking_url_type_store != "file":
+                    mlflow.log_artifact(model_path, "model")
+                    print(f"Model saved to {model_path} and logged to MLFlow")
+                else:
+                    mlflow.log_artifact(model_path, "model")
+                    print(f"Model saved to {model_path} and logged to MLFlow")
+                print("MLFlow run completed successfully")
+        except Exception as e:
+            print(f"Error in MLFlow logging: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise e
