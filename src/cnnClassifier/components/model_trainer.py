@@ -1,25 +1,18 @@
 import os
-import urllib.request as request
-from zipfile import ZipFile
 import tensorflow as tf
-import time
-from cnnClassifier.entity.config_entity import TrainingConfig
 from pathlib import Path
-
-
+from cnnClassifier.entity.config_entity import TrainingConfig
 
 class Training:
     def __init__(self, config: TrainingConfig):
         self.config = config
 
-    
     def get_base_model(self):
         self.model = tf.keras.models.load_model(
             self.config.updated_base_model_path
         )
 
     def train_valid_generator(self):
-
         datagenerator_kwargs = dict(
             rescale = 1./255,
             validation_split=0.20
@@ -62,27 +55,57 @@ class Training:
             **dataflow_kwargs
         )
 
-    
-    @staticmethod
-    def save_model(path: Path, model: tf.keras.Model):
-        model.save(path)
-
-
-
-    
     def train(self):
+        # Set memory growth for GPUs
+        physical_devices = tf.config.list_physical_devices('GPU')
+        try:
+            for device in physical_devices:
+                tf.config.experimental.set_memory_growth(device, True)
+        except:
+            pass
+
+        # Force eager execution
+        tf.config.run_functions_eagerly(True)
+        
         self.steps_per_epoch = self.train_generator.samples // self.train_generator.batch_size
         self.validation_steps = self.valid_generator.samples // self.valid_generator.batch_size
 
-        self.model.fit(
+        self.model.compile(
+            optimizer=tf.keras.optimizers.Adam(
+                learning_rate=self.config.params_learning_rate
+            ),
+            loss=tf.keras.losses.BinaryCrossentropy(),
+            metrics=['accuracy']
+        )
+
+        callback_list = [
+            tf.keras.callbacks.ModelCheckpoint(
+                filepath=str(self.config.trained_model_path),
+                monitor='val_loss',
+                save_best_only=True
+            ),
+            tf.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=3,
+                restore_best_weights=True
+            )
+        ]
+
+        history = self.model.fit(
             self.train_generator,
             epochs=self.config.params_epochs,
             steps_per_epoch=self.steps_per_epoch,
+            validation_data=self.valid_generator,
             validation_steps=self.validation_steps,
-            validation_data=self.valid_generator
+            callbacks=callback_list
         )
 
         self.save_model(
             path=self.config.trained_model_path,
             model=self.model
         )
+
+        return history
+
+    def save_model(self, path: Path, model: tf.keras.Model):
+        model.save(path)
