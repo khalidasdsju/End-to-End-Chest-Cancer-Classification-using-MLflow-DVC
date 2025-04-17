@@ -1,6 +1,7 @@
 import tensorflow as tf
 from pathlib import Path
 import mlflow
+import mlflow.pyfunc
 import os
 import tempfile
 from urllib.parse import urlparse
@@ -104,10 +105,25 @@ class Evaluation:
                 model_name = "ChestCancerClassifierModel"
 
                 if tracking_url_type_store != "file":
+                    # Use pyfunc module to log the model
+
+                    # Create a wrapper class for the model
+                    class KerasModelWrapper(mlflow.pyfunc.PythonModel):
+                        def __init__(self, model_path):
+                            self.model_path = model_path
+
+                        def load_context(self, context):
+                            import tensorflow as tf
+                            self.model = tf.keras.models.load_model(self.model_path)
+
+                        def predict(self, context, model_input):
+                            return self.model.predict(model_input)
+
                     # Log the model
-                    mlflow.keras.log_model(
-                        self.model,
-                        "model",
+                    mlflow.pyfunc.log_model(
+                        artifact_path="model",
+                        python_model=KerasModelWrapper(model_path),
+                        artifacts={"model_path": model_path},
                         registered_model_name=model_name
                     )
                     print(f"Model saved to {model_path} and registered in MLFlow Model Registry as '{model_name}'")
@@ -132,7 +148,25 @@ class Evaluation:
                         print(f"Warning: Could not transition model to staging: {str(e)}")
                 else:
                     # For local tracking, just log the model without registering
-                    mlflow.keras.log_model(self.model, "model")
+
+                    # Create a wrapper class for the model
+                    class KerasModelWrapper(mlflow.pyfunc.PythonModel):
+                        def __init__(self, model_path):
+                            self.model_path = model_path
+
+                        def load_context(self, context):
+                            import tensorflow as tf
+                            self.model = tf.keras.models.load_model(self.model_path)
+
+                        def predict(self, context, model_input):
+                            return self.model.predict(model_input)
+
+                    # Log the model
+                    mlflow.pyfunc.log_model(
+                        artifact_path="model",
+                        python_model=KerasModelWrapper(model_path),
+                        artifacts={"model_path": model_path}
+                    )
                     print(f"Model saved to {model_path} and logged to MLFlow (local tracking)")
                 print("MLFlow run completed successfully")
         except Exception as e:
